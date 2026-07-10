@@ -1,0 +1,19 @@
+{
+  "name": "@flowengine/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./types.ts"
+  },
+  "types": "./types.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "echo \"shared: no tests\"",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Pipeline {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  nodes     Node[]
+  edges     Edge[]
+}
+
+model Node {
+  id         String   @id @default(uuid())
+  pipelineId String
+  type       String
+  positionX  Float
+  positionY  Float
+  config     Json
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+}
+
+model Edge {
+  id         String   @id @default(uuid())
+  pipelineId String
+  sourceId   String
+  targetId   String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+}
