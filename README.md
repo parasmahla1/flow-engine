@@ -163,13 +163,3 @@ Socket events:
 - Client to server: `execute_pipeline`
 - Server to client: `execution_started`, `node_status_changed`, `data_flow`, `execution_completed`, `execution_error`
 
-## Security Notes
-
-HTTP source URLs are validated before execution. Localhost, private IP ranges, internal hostnames, and non-HTTP protocols are rejected to reduce SSRF risk.
-
-## Current Limitations
-
-- This is a single-user local development build.
-- Pipeline execution depends on Redis being available.
-- Persistence depends on PostgreSQL and Prisma migration setup.
-- Stopping a pipeline is currently local UI state only; queued backend cancellation is not implemented.
