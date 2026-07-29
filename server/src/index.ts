@@ -1,3 +1,4 @@
+import "./services/loadEnv.js";
 import cors from "@fastify/cors";
 import { PrismaClient } from "@prisma/client";
 import fastify from "fastify";
