@@ -9,3 +9,15 @@ export const validatePipeline = (pipeline: PipelineSchema): DagValidationResult 
 
   return validateDag(pipeline.nodes, pipeline.edges);
 };
+
+export const validatePipelineForSave = (pipeline: PipelineSchema): void => {
+  if (pipeline.nodes.length === 0) {
+    if (pipeline.edges.length > 0) {
+      throw new Error("Draft pipelines cannot contain edges without nodes.");
+    }
+
+    return;
+  }
+
+  validatePipeline(pipeline);
+};

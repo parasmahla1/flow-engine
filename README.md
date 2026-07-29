@@ -62,6 +62,7 @@ CLIENT_URL="http://localhost:3000"
 SERVER_PORT=4000
 NEXT_PUBLIC_API_URL="http://localhost:4000"
 NEXT_PUBLIC_SOCKET_URL="http://localhost:4000/pipeline"
+AUTH_TOKEN_SECRET="change-this-long-random-secret"
 ```
 
 For Supabase, use the pooled connection string for `DATABASE_URL` and the direct database connection string for `DIRECT_URL`. If your Supabase password contains special URL characters such as `@`, `#`, `/`, `?`, or `:`, percent-encode them in both URLs.
@@ -95,6 +96,8 @@ Create the `flowengine` database in PostgreSQL, then run the Prisma migration co
 npm --workspace @flowengine/server run prisma:migrate
 ```
 
+Migrations create the pipeline tables and the local `User` table used by FlowEngine auth. The first user can be created from the app's sign-up screen.
+
 ## Development
 
 Start Redis and PostgreSQL first, then run both apps:
@@ -115,6 +118,23 @@ Default URLs:
 - Frontend: `http://localhost:3000`
 - Backend health check: `http://localhost:4000/health`
 - Socket namespace: `http://localhost:4000/pipeline`
+
+## Auth
+
+FlowEngine uses local username/password auth backed by PostgreSQL. Passwords are hashed with Node crypto, and the API returns a signed bearer token that the client stores in `localStorage`.
+
+Set a long random `AUTH_TOKEN_SECRET` before running the server:
+
+```text
+AUTH_TOKEN_SECRET="replace-with-at-least-24-random-characters"
+```
+
+Protected surfaces:
+
+- Pipeline save/load/delete REST endpoints
+- Pipeline execution Socket.io namespace
+
+Use the sign-up screen on first launch, then sign in with that account.
 
 ## Scripts
 
@@ -162,4 +182,3 @@ Socket events:
 
 - Client to server: `execute_pipeline`
 - Server to client: `execution_started`, `node_status_changed`, `data_flow`, `execution_completed`, `execution_error`
-

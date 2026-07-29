@@ -88,6 +88,16 @@ export interface PipelineSchema {
   edges: PipelineEdge[];
 }
 
+export interface AuthUser {
+  id: string;
+  username: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+
 export interface NodeDefinition {
   kind: NodeKind;
   category: NodeCategory;

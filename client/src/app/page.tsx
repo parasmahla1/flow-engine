@@ -4,6 +4,7 @@ import { ReactFlowProvider } from "reactflow";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { PipelineCanvas } from "@/components/canvas/PipelineCanvas";
 import { NodeConfigPanel } from "@/components/config/NodeConfigPanel";
+import { AuthGate } from "@/components/auth/AuthGate";
 import { TopBar } from "@/components/layout/TopBar";
 import { DisconnectedBanner } from "@/components/layout/DisconnectedBanner";
 import { usePipelineExecution } from "@/hooks/usePipelineExecution";
@@ -26,8 +27,10 @@ const FlowWorkspace = () => {
 
 export default function Page() {
   return (
-    <ReactFlowProvider>
-      <FlowWorkspace />
-    </ReactFlowProvider>
+    <AuthGate>
+      <ReactFlowProvider>
+        <FlowWorkspace />
+      </ReactFlowProvider>
+    </AuthGate>
   );
 }

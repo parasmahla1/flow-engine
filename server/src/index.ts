@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import fastify from "fastify";
 import { Server } from "socket.io";
 import type { ClientToServerEvents, ServerToClientEvents } from "@flowengine/shared";
+import { authRoutes } from "./routes/auth.js";
 import { pipelineRoutes } from "./routes/pipelines.js";
 import { registerPipelineSocket } from "./sockets/pipelineSocket.js";
 import { createPipelineQueue, createPipelineWorker } from "./workers/pipelineWorker.js";
@@ -26,9 +27,11 @@ const worker = createPipelineWorker(namespace);
 
 await app.register(cors, {
   origin: clientUrl,
-  methods: ["GET", "POST", "PUT", "DELETE"]
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["content-type", "authorization"]
 });
 
+await app.register(authRoutes(prisma));
 await app.register(pipelineRoutes(prisma));
 
 app.get("/health", async () => ({

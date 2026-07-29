@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { Socket } from "socket.io-client";
 import type { ClientToServerEvents, ServerToClientEvents } from "@flowengine/shared";
+import { getAuthToken } from "@/lib/authToken";
 import { usePipelineStore } from "@/store/pipelineStore";
 
 type PipelineSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -22,7 +23,10 @@ export const usePipelineExecution = () => {
 
       const socket: PipelineSocket = io(socketUrl, {
         transports: ["websocket"],
-        autoConnect: true
+        autoConnect: true,
+        auth: {
+          token: getAuthToken()
+        }
       });
 
       socketRef.current = socket;
@@ -34,6 +38,11 @@ export const usePipelineExecution = () => {
 
       socket.on("disconnect", () => {
         usePipelineStore.getState().setConnectionStatus("disconnected");
+      });
+
+      socket.on("connect_error", (error) => {
+        usePipelineStore.getState().setConnectionStatus("disconnected");
+        usePipelineStore.getState().failExecution(error.message);
       });
 
       socket.on("execution_started", ({ executionId }) => {

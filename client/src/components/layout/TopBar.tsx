@@ -1,8 +1,9 @@
 "use client";
 
-import { Play, Save, Square } from "lucide-react";
+import { LogOut, Play, Save, Square } from "lucide-react";
 import { useState } from "react";
 import { savePipeline } from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
 import { usePipelineStore } from "@/store/pipelineStore";
 
 interface TopBarProps {
@@ -15,9 +16,12 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   const pipelineName = usePipelineStore((state) => state.pipelineName);
   const isRunning = usePipelineStore((state) => state.isRunning);
   const lastError = usePipelineStore((state) => state.lastError);
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const setPipelineName = usePipelineStore((state) => state.setPipelineName);
   const loadPipeline = usePipelineStore((state) => state.loadPipeline);
   const toPipelineSchema = usePipelineStore((state) => state.toPipelineSchema);
+  const failExecution = usePipelineStore((state) => state.failExecution);
 
   const handleSave = async () => {
     setSaving(true);
@@ -25,6 +29,8 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
     try {
       const saved = await savePipeline(toPipelineSchema());
       loadPipeline(saved);
+    } catch (error) {
+      failExecution(error instanceof Error ? error.message : "Unable to save pipeline.");
     } finally {
       setSaving(false);
     }
@@ -82,6 +88,19 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
       >
         <Square size={16} fill="currentColor" />
       </button>
+
+      <div className="flex h-9 items-center gap-2 border-l border-zinc-300 pl-3">
+        <span className="max-w-28 truncate text-xs font-medium text-zinc-600">{user?.username}</span>
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"
+          onClick={logout}
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <LogOut size={16} />
+        </button>
+      </div>
     </header>
   );
 };
