@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -24,12 +24,30 @@ const selector = (state: ReturnType<typeof usePipelineStore.getState>) => ({
   onEdgesChange: state.onEdgesChange,
   connectNodes: state.connectNodes,
   addNode: state.addNode,
-  selectNode: state.selectNode
+  selectNode: state.selectNode,
+  deleteSelection: state.deleteSelection,
+  copySelection: state.copySelection,
+  pasteWorkflow: state.pasteWorkflow,
+  undo: state.undo,
+  redo: state.redo
 });
 
 export const PipelineCanvas = () => {
   const { screenToFlowPosition } = useReactFlow();
-  const { nodes, edges, onNodesChange, onEdgesChange, connectNodes, addNode, selectNode } =
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    connectNodes,
+    addNode,
+    selectNode,
+    deleteSelection,
+    copySelection,
+    pasteWorkflow,
+    undo,
+    redo
+  } =
     usePipelineStore(selector, shallow);
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ pipelineNode: PipelineNode }), []);
@@ -60,6 +78,60 @@ export const PipelineCanvas = () => {
     [addNode, screenToFlowPosition]
   );
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isEditable =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement;
+
+      if (isEditable) {
+        return;
+      }
+
+      const commandKey = event.metaKey || event.ctrlKey;
+
+      if ((event.key === "Delete" || event.key === "Backspace") && !commandKey) {
+        deleteSelection();
+        return;
+      }
+
+      if (!commandKey) {
+        return;
+      }
+
+      if (event.key.toLowerCase() === "z" && event.shiftKey) {
+        event.preventDefault();
+        redo();
+        return;
+      }
+
+      if (event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        undo();
+        return;
+      }
+
+      if (event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        copySelection();
+        return;
+      }
+
+      if (event.key.toLowerCase() === "v") {
+        event.preventDefault();
+        pasteWorkflow();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [copySelection, deleteSelection, pasteWorkflow, redo, undo]);
+
   return (
     <section className="min-w-0 flex-1 bg-zinc-100">
       <ReactFlow
@@ -79,6 +151,8 @@ export const PipelineCanvas = () => {
         fitView
         multiSelectionKeyCode={["Meta", "Shift"]}
         selectionKeyCode="Shift"
+        deleteKeyCode={null}
+        proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{ type: "particle" }}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#c4c4c7" />

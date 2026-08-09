@@ -1,6 +1,16 @@
 "use client";
 
-import { LogOut, Play, Save, Square } from "lucide-react";
+import {
+  ClipboardPaste,
+  Copy,
+  LogOut,
+  Play,
+  Redo2,
+  Save,
+  Square,
+  Trash2,
+  Undo2
+} from "lucide-react";
 import { useState } from "react";
 import { savePipeline } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
@@ -15,6 +25,11 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   const [saving, setSaving] = useState(false);
   const pipelineName = usePipelineStore((state) => state.pipelineName);
   const isRunning = usePipelineStore((state) => state.isRunning);
+  const nodes = usePipelineStore((state) => state.nodes);
+  const edges = usePipelineStore((state) => state.edges);
+  const historyPast = usePipelineStore((state) => state.historyPast);
+  const historyFuture = usePipelineStore((state) => state.historyFuture);
+  const copiedWorkflow = usePipelineStore((state) => state.copiedWorkflow);
   const lastError = usePipelineStore((state) => state.lastError);
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -22,6 +37,12 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   const loadPipeline = usePipelineStore((state) => state.loadPipeline);
   const toPipelineSchema = usePipelineStore((state) => state.toPipelineSchema);
   const failExecution = usePipelineStore((state) => state.failExecution);
+  const undo = usePipelineStore((state) => state.undo);
+  const redo = usePipelineStore((state) => state.redo);
+  const copySelection = usePipelineStore((state) => state.copySelection);
+  const pasteWorkflow = usePipelineStore((state) => state.pasteWorkflow);
+  const deleteSelection = usePipelineStore((state) => state.deleteSelection);
+  const hasSelection = nodes.some((node) => node.selected) || edges.some((edge) => edge.selected);
 
   const handleSave = async () => {
     setSaving(true);
@@ -57,6 +78,59 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
           {lastError}
         </div>
       ) : null}
+
+      <div className="flex h-9 items-center gap-1 border-l border-zinc-300 pl-3">
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={historyPast.length === 0}
+          onClick={undo}
+          aria-label="Undo"
+          title="Undo"
+        >
+          <Undo2 size={16} />
+        </button>
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={historyFuture.length === 0}
+          onClick={redo}
+          aria-label="Redo"
+          title="Redo"
+        >
+          <Redo2 size={16} />
+        </button>
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!hasSelection}
+          onClick={copySelection}
+          aria-label="Copy"
+          title="Copy"
+        >
+          <Copy size={16} />
+        </button>
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!copiedWorkflow}
+          onClick={pasteWorkflow}
+          aria-label="Paste"
+          title="Paste"
+        >
+          <ClipboardPaste size={16} />
+        </button>
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!hasSelection}
+          onClick={deleteSelection}
+          aria-label="Delete"
+          title="Delete"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
 
       <button
         type="button"

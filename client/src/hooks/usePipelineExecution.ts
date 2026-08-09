@@ -61,6 +61,10 @@ export const usePipelineExecution = () => {
         usePipelineStore.getState().triggerFlow(edgeId, chunkSize);
       });
 
+      socket.on("node_output", (payload) => {
+        usePipelineStore.getState().appendNodeOutput(payload);
+      });
+
       socket.on("execution_completed", () => {
         usePipelineStore.getState().finishExecution();
       });

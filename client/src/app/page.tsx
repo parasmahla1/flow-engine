@@ -4,6 +4,7 @@ import { ReactFlowProvider } from "reactflow";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { PipelineCanvas } from "@/components/canvas/PipelineCanvas";
 import { NodeConfigPanel } from "@/components/config/NodeConfigPanel";
+import { OutputPanel } from "@/components/output/OutputPanel";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { TopBar } from "@/components/layout/TopBar";
 import { DisconnectedBanner } from "@/components/layout/DisconnectedBanner";
@@ -18,7 +19,10 @@ const FlowWorkspace = () => {
       <DisconnectedBanner />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <AppSidebar />
-        <PipelineCanvas />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <PipelineCanvas />
+          <OutputPanel />
+        </div>
         <NodeConfigPanel />
       </div>
     </main>

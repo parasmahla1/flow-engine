@@ -120,6 +120,12 @@ export interface DataFlowPayload {
   chunkSize: number;
 }
 
+export interface NodeOutputPayload {
+  nodeId: string;
+  records: JsonObject[];
+  emittedAt: string;
+}
+
 export interface ExecutionCompletedPayload {
   executionId: string;
   totalDuration: number;
@@ -140,6 +146,7 @@ export interface ServerToClientEvents {
   execution_started: (payload: ExecutionStartedPayload) => void;
   node_status_changed: (payload: NodeStatusChangedPayload) => void;
   data_flow: (payload: DataFlowPayload) => void;
+  node_output: (payload: NodeOutputPayload) => void;
   execution_completed: (payload: ExecutionCompletedPayload) => void;
   execution_error: (payload: ExecutionErrorPayload) => void;
 }

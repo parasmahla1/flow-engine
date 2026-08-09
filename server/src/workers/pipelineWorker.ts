@@ -75,10 +75,19 @@ const executeJob = async (
         try {
           const inputChunks = incomingChunksForNode(node.id, pipeline.edges, chunksByNodeId);
           const result = await executePipelineNode(node, inputChunks);
+          const inputRecords = inputChunks.flatMap((chunk) => chunk.records);
 
           chunksByNodeId.set(node.id, result.chunks);
           totalDataProcessed += result.dataProcessed;
           namespace.emit("node_status_changed", { nodeId: node.id, status: "success" });
+
+          if (node.kind === "CONSOLE_SINK") {
+            namespace.emit("node_output", {
+              nodeId: node.id,
+              records: inputRecords.slice(-25),
+              emittedAt: new Date().toISOString()
+            });
+          }
 
           for (const edge of outgoingEdgesForNode(node.id, pipeline.edges)) {
             for (const chunk of result.chunks) {
