@@ -67,6 +67,7 @@ interface PipelineState {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   connectNodes: (connection: Connection) => boolean;
+  deleteEdge: (edgeId: string) => void;
   deleteSelection: () => void;
   copySelection: () => void;
   pasteWorkflow: () => void;
@@ -255,6 +256,17 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     set(withHistory(state, { nodes: state.nodes, edges: addEdge(candidateEdge, state.edges) }));
     return true;
   },
+  deleteEdge: (edgeId) =>
+    set((state) => {
+      if (!state.edges.some((edge) => edge.id === edgeId)) {
+        return {};
+      }
+
+      return withHistory(state, {
+        nodes: state.nodes,
+        edges: state.edges.filter((edge) => edge.id !== edgeId)
+      });
+    }),
   deleteSelection: () =>
     set((state) => {
       const selectedNodeIds = new Set(

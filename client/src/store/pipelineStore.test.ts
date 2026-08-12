@@ -86,6 +86,24 @@ describe("pipeline store", () => {
     expect(usePipelineStore.getState().edges).toHaveLength(0);
   });
 
+  it("deletes a single edge without removing connected nodes", () => {
+    const source = usePipelineStore.getState().addNode("MOCK_SOURCE", { x: 0, y: 0 });
+    const sink = usePipelineStore.getState().addNode("CONSOLE_SINK", { x: 320, y: 0 });
+    usePipelineStore.getState().connectNodes({
+      source,
+      target: sink,
+      sourceHandle: "output",
+      targetHandle: "input"
+    });
+    const edgeId = usePipelineStore.getState().edges[0]?.id;
+
+    expect(edgeId).toBeDefined();
+    usePipelineStore.getState().deleteEdge(edgeId ?? "");
+
+    expect(usePipelineStore.getState().nodes).toHaveLength(2);
+    expect(usePipelineStore.getState().edges).toHaveLength(0);
+  });
+
   it("undoes and redoes graph edits", () => {
     usePipelineStore.getState().addNode("MOCK_SOURCE", { x: 0, y: 0 });
     expect(usePipelineStore.getState().nodes).toHaveLength(1);
