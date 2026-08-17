@@ -47,6 +47,24 @@ export interface OutputLogEntry extends NodeOutputPayload {
   id: string;
 }
 
+export interface NodeInspectorSnapshot {
+  input: JsonObject[];
+  output: JsonObject[];
+  updatedAt: string;
+}
+
+export type RunHistoryStatus = "running" | "success" | "error" | "stopped";
+
+export interface RunHistoryEntry {
+  executionId: string;
+  status: RunHistoryStatus;
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  totalDataProcessed?: number;
+  error?: string;
+}
+
 interface PipelineState {
   pipelineId: string | null;
   pipelineName: string;
@@ -56,6 +74,8 @@ interface PipelineState {
   historyFuture: GraphSnapshot[];
   copiedWorkflow: CopiedWorkflow | null;
   outputLogs: OutputLogEntry[];
+  nodeInspector: Record<string, NodeInspectorSnapshot>;
+  runHistory: RunHistoryEntry[];
   selectedNodeId: string | null;
   isRunning: boolean;
   connectionStatus: "connecting" | "connected" | "disconnected";
@@ -79,7 +99,7 @@ interface PipelineState {
   appendNodeOutput: (payload: NodeOutputPayload) => void;
   clearOutput: () => void;
   startExecution: (executionId: string) => void;
-  finishExecution: () => void;
+  finishExecution: (summary?: { totalDuration: number; totalDataProcessed: number }) => void;
   failExecution: (message: string) => void;
   stopLocalExecution: () => void;
   setConnectionStatus: (status: PipelineState["connectionStatus"]) => void;
@@ -193,6 +213,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   historyFuture: [],
   copiedWorkflow: null,
   outputLogs: [],
+  nodeInspector: {},
+  runHistory: [],
   selectedNodeId: null,
   isRunning: false,
   connectionStatus: "connecting",
@@ -480,7 +502,15 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
                 }
               }
             : node
-        )
+        ),
+        nodeInspector: {
+          ...state.nodeInspector,
+          [payload.nodeId]: {
+            input: payload.inputRecords,
+            output: payload.records,
+            updatedAt: payload.emittedAt
+          }
+        }
       };
     }),
   clearOutput: () => set({ outputLogs: [] }),
@@ -490,6 +520,15 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       isRunning: true,
       lastError: null,
       outputLogs: [],
+      nodeInspector: {},
+      runHistory: [
+        {
+          executionId: lastExecutionId,
+          status: "running" as const,
+          startedAt: new Date().toISOString()
+        },
+        ...state.runHistory
+      ].slice(0, 25),
       nodes: state.nodes.map((node) => ({
         ...node,
         data: {
@@ -499,11 +538,52 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         }
       }))
     })),
-  finishExecution: () => set({ isRunning: false }),
-  failExecution: (lastError) => set({ lastError, isRunning: false }),
+  finishExecution: (summary) =>
+    set((state) => ({
+      isRunning: false,
+      runHistory: state.runHistory.map((entry, index) =>
+        index === 0 && entry.status === "running"
+          ? {
+              ...entry,
+              status: "success",
+              completedAt: new Date().toISOString(),
+              ...(summary
+                ? {
+                    durationMs: summary.totalDuration,
+                    totalDataProcessed: summary.totalDataProcessed
+                  }
+                : {})
+            }
+          : entry
+      )
+    })),
+  failExecution: (lastError) =>
+    set((state) => ({
+      lastError,
+      isRunning: false,
+      runHistory: state.runHistory.map((entry, index) =>
+        index === 0 && entry.status === "running"
+          ? {
+              ...entry,
+              status: "error",
+              completedAt: new Date().toISOString(),
+              error: lastError
+            }
+          : entry
+      )
+    })),
   stopLocalExecution: () =>
     set((state) => ({
       isRunning: false,
+      runHistory: state.runHistory.map((entry, index) =>
+        index === 0 && entry.status === "running"
+          ? {
+              ...entry,
+              status: "stopped",
+              completedAt: new Date().toISOString()
+            }
+          : entry
+      ),
       nodes: state.nodes.map((node) => ({
         ...node,
         data: {
@@ -522,6 +602,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       historyPast: [],
       historyFuture: [],
       outputLogs: [],
+      nodeInspector: {},
       selectedNodeId: null,
       lastError: null
     }),

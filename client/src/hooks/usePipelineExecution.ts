@@ -65,8 +65,8 @@ export const usePipelineExecution = () => {
         usePipelineStore.getState().appendNodeOutput(payload);
       });
 
-      socket.on("execution_completed", () => {
-        usePipelineStore.getState().finishExecution();
+      socket.on("execution_completed", ({ totalDuration, totalDataProcessed }) => {
+        usePipelineStore.getState().finishExecution({ totalDuration, totalDataProcessed });
       });
 
       socket.on("execution_error", ({ message }) => {

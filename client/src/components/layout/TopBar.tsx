@@ -8,21 +8,36 @@ import {
   Redo2,
   Save,
   Square,
+  Upload,
+  Download,
   Trash2,
   Undo2
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { savePipeline } from "@/lib/api";
+import { validateWorkflow } from "@/lib/pipelineValidation";
 import { useAuthStore } from "@/store/authStore";
 import { usePipelineStore } from "@/store/pipelineStore";
+import type { PipelineSchema } from "@flowengine/shared";
 
 interface TopBarProps {
   onRun: () => void;
   onStop: () => void;
 }
 
+const isImportablePipeline = (value: unknown): value is PipelineSchema =>
+  typeof value === "object" &&
+  value !== null &&
+  "name" in value &&
+  typeof value.name === "string" &&
+  "nodes" in value &&
+  Array.isArray(value.nodes) &&
+  "edges" in value &&
+  Array.isArray(value.edges);
+
 export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   const [saving, setSaving] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const pipelineName = usePipelineStore((state) => state.pipelineName);
   const isRunning = usePipelineStore((state) => state.isRunning);
   const nodes = usePipelineStore((state) => state.nodes);
@@ -43,6 +58,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   const pasteWorkflow = usePipelineStore((state) => state.pasteWorkflow);
   const deleteSelection = usePipelineStore((state) => state.deleteSelection);
   const hasSelection = nodes.some((node) => node.selected) || edges.some((edge) => edge.selected);
+  const validation = validateWorkflow(nodes, edges);
 
   const handleSave = async () => {
     setSaving(true);
@@ -54,6 +70,46 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
       failExecution(error instanceof Error ? error.message : "Unable to save pipeline.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleExport = () => {
+    const pipeline = toPipelineSchema();
+    const blob = new Blob([JSON.stringify(pipeline, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `${pipeline.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "pipeline"}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = async (file: File | undefined) => {
+    if (!file) {
+      return;
+    }
+
+    try {
+      const imported = JSON.parse(await file.text()) as unknown;
+
+      if (!isImportablePipeline(imported)) {
+        throw new Error("Invalid pipeline JSON.");
+      }
+
+      loadPipeline({
+        name: imported.name,
+        nodes: imported.nodes,
+        edges: imported.edges
+      });
+    } catch (error) {
+      failExecution(error instanceof Error ? error.message : "Unable to import workflow.");
+    } finally {
+      if (importInputRef.current) {
+        importInputRef.current.value = "";
+      }
     }
   };
 
@@ -132,6 +188,34 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         </button>
       </div>
 
+      <div className="flex h-9 items-center gap-1 border-l border-zinc-300 pl-3">
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"
+          onClick={handleExport}
+          aria-label="Export workflow"
+          title="Export workflow"
+        >
+          <Download size={16} />
+        </button>
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"
+          onClick={() => importInputRef.current?.click()}
+          aria-label="Import workflow"
+          title="Import workflow"
+        >
+          <Upload size={16} />
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(event) => void handleImport(event.target.files?.[0])}
+        />
+      </div>
+
       <button
         type="button"
         className="inline-flex h-9 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -145,8 +229,16 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
       <button
         type="button"
         className="inline-flex h-9 items-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isRunning}
-        onClick={onRun}
+        disabled={isRunning || !validation.isReady}
+        onClick={() => {
+          if (!validation.isReady) {
+            failExecution("Fix validation errors before running.");
+            return;
+          }
+
+          onRun();
+        }}
+        title={validation.isReady ? "Run" : "Fix validation errors before running"}
       >
         <Play size={16} fill="currentColor" />
         Run

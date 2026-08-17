@@ -71,7 +71,8 @@ export const OutputPanel = () => {
                 {
                   nodeId: entry.nodeId,
                   emittedAt: entry.emittedAt,
-                  records: entry.records
+                  inputRecords: entry.inputRecords,
+                  outputRecords: entry.records
                 },
                 null,
                 2

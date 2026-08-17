@@ -12,6 +12,8 @@ describe("pipeline store", () => {
       historyFuture: [],
       copiedWorkflow: null,
       outputLogs: [],
+      nodeInspector: {},
+      runHistory: [],
       selectedNodeId: null,
       isRunning: false,
       connectionStatus: "connected",
@@ -133,5 +135,23 @@ describe("pipeline store", () => {
 
     expect(usePipelineStore.getState().nodes).toHaveLength(4);
     expect(usePipelineStore.getState().edges).toHaveLength(2);
+  });
+
+  it("records run history and node inspector output", () => {
+    const sink = usePipelineStore.getState().addNode("CONSOLE_SINK", { x: 0, y: 0 });
+
+    usePipelineStore.getState().startExecution("execution-1");
+    usePipelineStore.getState().appendNodeOutput({
+      nodeId: sink,
+      inputRecords: [{ value: "input" }],
+      records: [{ value: "output" }],
+      emittedAt: "2026-08-12T00:00:00.000Z"
+    });
+    usePipelineStore.getState().finishExecution({ totalDuration: 42, totalDataProcessed: 1 });
+
+    expect(usePipelineStore.getState().runHistory[0]?.status).toBe("success");
+    expect(usePipelineStore.getState().runHistory[0]?.durationMs).toBe(42);
+    expect(usePipelineStore.getState().nodeInspector[sink]?.input).toEqual([{ value: "input" }]);
+    expect(usePipelineStore.getState().nodeInspector[sink]?.output).toEqual([{ value: "output" }]);
   });
 });

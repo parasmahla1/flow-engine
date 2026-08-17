@@ -122,6 +122,7 @@ export interface DataFlowPayload {
 
 export interface NodeOutputPayload {
   nodeId: string;
+  inputRecords: JsonObject[];
   records: JsonObject[];
   emittedAt: string;
 }

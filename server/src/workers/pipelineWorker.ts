@@ -84,6 +84,7 @@ const executeJob = async (
           if (node.kind === "CONSOLE_SINK") {
             namespace.emit("node_output", {
               nodeId: node.id,
+              inputRecords: inputRecords.slice(-25),
               records: inputRecords.slice(-25),
               emittedAt: new Date().toISOString()
             });
