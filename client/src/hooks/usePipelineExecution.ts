@@ -65,8 +65,20 @@ export const usePipelineExecution = () => {
         usePipelineStore.getState().appendNodeOutput(payload);
       });
 
+      socket.on("execution_progress", ({ completedNodes, totalNodes, currentNodeId }) => {
+        usePipelineStore.getState().setExecutionProgress({
+          completedNodes,
+          totalNodes,
+          currentNodeId
+        });
+      });
+
       socket.on("execution_completed", ({ totalDuration, totalDataProcessed }) => {
         usePipelineStore.getState().finishExecution({ totalDuration, totalDataProcessed });
+      });
+
+      socket.on("execution_cancelled", ({ message }) => {
+        usePipelineStore.getState().cancelExecution(message);
       });
 
       socket.on("execution_error", ({ message }) => {
@@ -93,9 +105,18 @@ export const usePipelineExecution = () => {
     socket.emit("execute_pipeline", state.toPipelineSchema());
   }, []);
 
-  const stopLocalExecution = useCallback(() => {
-    usePipelineStore.getState().stopLocalExecution();
+  const cancelExecution = useCallback(() => {
+    const socket = socketRef.current;
+    const state = usePipelineStore.getState();
+
+    if (!state.lastExecutionId) {
+      state.stopLocalExecution();
+      return;
+    }
+
+    state.stopLocalExecution();
+    socket?.emit("cancel_execution", { executionId: state.lastExecutionId });
   }, []);
 
-  return { runPipeline, stopLocalExecution };
+  return { runPipeline, cancelExecution };
 };

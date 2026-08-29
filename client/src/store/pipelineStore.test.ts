@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { buildPipelineFromTemplate, pipelineTemplates } from "../lib/pipelineTemplates";
 import { usePipelineStore } from "./pipelineStore";
 
 describe("pipeline store", () => {
@@ -14,6 +15,7 @@ describe("pipeline store", () => {
       outputLogs: [],
       nodeInspector: {},
       runHistory: [],
+      runProgress: null,
       selectedNodeId: null,
       isRunning: false,
       connectionStatus: "connected",
@@ -153,5 +155,53 @@ describe("pipeline store", () => {
     expect(usePipelineStore.getState().runHistory[0]?.durationMs).toBe(42);
     expect(usePipelineStore.getState().nodeInspector[sink]?.input).toEqual([{ value: "input" }]);
     expect(usePipelineStore.getState().nodeInspector[sink]?.output).toEqual([{ value: "output" }]);
+  });
+
+  it("auto-arranges nodes left-to-right by graph topology", () => {
+    const source = usePipelineStore.getState().addNode("MOCK_SOURCE", { x: 500, y: 500 });
+    const delay = usePipelineStore.getState().addNode("DELAY", { x: 0, y: 0 });
+    const sink = usePipelineStore.getState().addNode("CONSOLE_SINK", { x: 100, y: 100 });
+
+    usePipelineStore.getState().connectNodes({
+      source,
+      target: delay,
+      sourceHandle: "output",
+      targetHandle: "input"
+    });
+    usePipelineStore.getState().connectNodes({
+      source: delay,
+      target: sink,
+      sourceHandle: "output",
+      targetHandle: "input"
+    });
+
+    usePipelineStore.getState().autoLayout();
+
+    const nodes = usePipelineStore.getState().nodes;
+    const sourceNode = nodes.find((node) => node.id === source);
+    const delayNode = nodes.find((node) => node.id === delay);
+    const sinkNode = nodes.find((node) => node.id === sink);
+
+    expect(sourceNode?.position.x).toBeLessThan(delayNode?.position.x ?? 0);
+    expect(delayNode?.position.x).toBeLessThan(sinkNode?.position.x ?? 0);
+  });
+
+  it("loads templates and prevents graph edits while running", () => {
+    const template = pipelineTemplates[0];
+
+    if (!template) {
+      throw new Error("Expected at least one pipeline template.");
+    }
+
+    usePipelineStore.getState().replaceWorkflow(buildPipelineFromTemplate(template));
+
+    expect(usePipelineStore.getState().nodes).toHaveLength(3);
+    expect(usePipelineStore.getState().edges).toHaveLength(2);
+
+    usePipelineStore.getState().startExecution("execution-2");
+    const nodeId = usePipelineStore.getState().addNode("HTTP_SOURCE", { x: 0, y: 0 });
+
+    expect(nodeId).toBe("");
+    expect(usePipelineStore.getState().nodes).toHaveLength(3);
   });
 });

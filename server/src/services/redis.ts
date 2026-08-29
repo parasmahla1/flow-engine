@@ -5,11 +5,13 @@ let loggedRedisError = false;
 type RedisConnectionSettings =
   | {
       kind: "url";
+      provider: "upstash" | "redis";
       useTls: boolean;
       url: string;
     }
   | {
       kind: "options";
+      provider: "upstash" | "redis";
       useTls: boolean;
       host: string;
       port: number;
@@ -32,25 +34,65 @@ const parsePort = (value: string | undefined): number => {
 };
 
 const getRedisConnectionSettings = (): RedisConnectionSettings => {
+  const upstashRedisUrl = optionalValue(process.env.UPSTASH_REDIS_URL);
   const redisUrl = optionalValue(process.env.REDIS_URL);
   const envTls = isTruthy(process.env.REDIS_TLS);
 
-  if (redisUrl) {
+  if (upstashRedisUrl?.startsWith("http")) {
+    throw new Error(
+      "UPSTASH_REDIS_URL must be the Redis TCP URL, for example rediss://default:<password>@<endpoint>.upstash.io:6379. Use the Redis/ioredis connection string, not the REST URL."
+    );
+  }
+
+  if (upstashRedisUrl) {
     return {
       kind: "url",
+      provider: "upstash",
+      url: upstashRedisUrl,
+      useTls: upstashRedisUrl.startsWith("rediss://") || envTls
+    };
+  }
+
+  if (redisUrl) {
+    if (redisUrl.startsWith("http")) {
+      throw new Error(
+        "REDIS_URL must be a Redis TCP URL, for example rediss://default:<password>@<endpoint>.upstash.io:6379. REST URLs cannot be used by BullMQ."
+      );
+    }
+
+    return {
+      kind: "url",
+      provider: redisUrl.includes("upstash.io") ? "upstash" : "redis",
       url: redisUrl,
       useTls: redisUrl.startsWith("rediss://") || envTls
     };
   }
 
-  const username = optionalValue(process.env.REDIS_USERNAME);
-  const password = optionalValue(process.env.REDIS_PASSWORD);
+  const upstashHost =
+    optionalValue(process.env.UPSTASH_REDIS_HOST) ??
+    optionalValue(process.env.UPSTASH_REDIS_ENDPOINT);
+  const upstashPassword = optionalValue(process.env.UPSTASH_REDIS_PASSWORD);
+  const username =
+    optionalValue(process.env.UPSTASH_REDIS_USERNAME) ??
+    optionalValue(process.env.REDIS_USERNAME);
+  const password = upstashPassword ?? optionalValue(process.env.REDIS_PASSWORD);
+
+  if (!upstashHost && optionalValue(process.env.UPSTASH_REDIS_REST_URL)) {
+    throw new Error(
+      "BullMQ requires an Upstash TCP Redis URL. Set UPSTASH_REDIS_URL from the Redis/ioredis connection string, not UPSTASH_REDIS_REST_URL."
+    );
+  }
 
   return {
     kind: "options",
-    host: optionalValue(process.env.REDIS_HOST) ?? "localhost",
-    port: parsePort(process.env.REDIS_PORT),
-    useTls: envTls,
+    provider: upstashHost ? "upstash" : "redis",
+    host: upstashHost ?? optionalValue(process.env.REDIS_HOST) ?? "localhost",
+    port: parsePort(
+      upstashHost
+        ? process.env.UPSTASH_REDIS_PORT ?? "6379"
+        : process.env.REDIS_PORT
+    ),
+    useTls: upstashHost ? process.env.REDIS_TLS !== "false" : envTls,
     ...(username ? { username } : {}),
     ...(password ? { password } : {})
   };
@@ -58,19 +100,19 @@ const getRedisConnectionSettings = (): RedisConnectionSettings => {
 
 const describeRedisTarget = (settings: RedisConnectionSettings): string => {
   if (settings.kind === "options") {
-    return `redis://${settings.host}:${settings.port} tls=${settings.useTls ? "on" : "off"} auth=${
-      settings.password ? "yes" : "no"
-    }`;
+    return `${settings.provider}://${settings.host}:${settings.port} tls=${
+      settings.useTls ? "on" : "off"
+    } auth=${settings.password ? "yes" : "no"}`;
   }
 
   try {
     const parsed = new URL(settings.url);
 
-    return `${parsed.protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ""} tls=${
+    return `${settings.provider}:${parsed.protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ""} tls=${
       settings.useTls ? "on" : "off"
     } auth=${parsed.password ? "yes" : "no"}`;
   } catch {
-    return `invalid Redis URL tls=${settings.useTls ? "on" : "off"}`;
+    return `invalid ${settings.provider} Redis URL tls=${settings.useTls ? "on" : "off"}`;
   }
 };
 
@@ -85,7 +127,13 @@ const logRedisError = (settings: RedisConnectionSettings, error: Error): void =>
 
   if (error.message.includes("packet length too long")) {
     console.error(
-      "[redis] TLS mismatch detected. Use redis:// with REDIS_TLS=false for a non-TLS Redis Cloud endpoint, or use the Redis Cloud TLS endpoint with rediss://."
+      "[redis] TLS mismatch detected. Upstash TCP endpoints should usually use rediss:// or REDIS_TLS=true."
+    );
+  }
+
+  if (settings.provider === "upstash" && settings.kind === "url" && settings.url.startsWith("https://")) {
+    console.error(
+      "[redis] UPSTASH_REDIS_URL must be the Redis TCP URL, for example rediss://default:<password>@<endpoint>.upstash.io:6379. The REST URL cannot be used by BullMQ."
     );
   }
 };

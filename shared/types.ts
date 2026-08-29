@@ -133,6 +133,18 @@ export interface ExecutionCompletedPayload {
   totalDataProcessed: number;
 }
 
+export interface ExecutionProgressPayload {
+  executionId: string;
+  completedNodes: number;
+  totalNodes: number;
+  currentNodeId?: string | undefined;
+}
+
+export interface ExecutionCancelledPayload {
+  executionId: string;
+  message: string;
+}
+
 export interface ExecutionErrorPayload {
   executionId?: string;
   message: string;
@@ -141,6 +153,7 @@ export interface ExecutionErrorPayload {
 
 export interface ClientToServerEvents {
   execute_pipeline: (payload: PipelineSchema) => void;
+  cancel_execution: (payload: { executionId: string }) => void;
 }
 
 export interface ServerToClientEvents {
@@ -148,7 +161,9 @@ export interface ServerToClientEvents {
   node_status_changed: (payload: NodeStatusChangedPayload) => void;
   data_flow: (payload: DataFlowPayload) => void;
   node_output: (payload: NodeOutputPayload) => void;
+  execution_progress: (payload: ExecutionProgressPayload) => void;
   execution_completed: (payload: ExecutionCompletedPayload) => void;
+  execution_cancelled: (payload: ExecutionCancelledPayload) => void;
   execution_error: (payload: ExecutionErrorPayload) => void;
 }
 

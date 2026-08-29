@@ -56,8 +56,7 @@ Required values:
 ```text
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/flowengine?schema=public"
 DIRECT_URL="postgresql://postgres:postgres@localhost:5432/flowengine?schema=public"
-REDIS_URL="redis://localhost:6379"
-REDIS_TLS="false"
+UPSTASH_REDIS_URL="rediss://default:<password>@<endpoint>.upstash.io:6379"
 CLIENT_URL="http://localhost:3000"
 SERVER_PORT=4000
 NEXT_PUBLIC_API_URL="http://localhost:4000"
@@ -67,19 +66,24 @@ AUTH_TOKEN_SECRET="change-this-long-random-secret"
 
 For Supabase, use the pooled connection string for `DATABASE_URL` and the direct database connection string for `DIRECT_URL`. If your Supabase password contains special URL characters such as `@`, `#`, `/`, `?`, or `:`, percent-encode them in both URLs.
 
-For Redis Cloud, use `rediss://...` when the database requires TLS. If Redis Cloud gives you a `redis://...` URL but TLS is enabled in the dashboard, keep the URL and set `REDIS_TLS="true"`.
-
-Redis Cloud's Node.js snippet may show separate `username`, `password`, `host`, and `port` fields. You can either convert those fields into `REDIS_URL`, or use them directly:
+For Upstash Redis, use the Redis TCP connection string from the Redis/ioredis section of the Upstash console:
 
 ```text
-REDIS_HOST="seed-marmalade-plum-71702.db.redis.io"
-REDIS_PORT="12730"
-REDIS_USERNAME="default"
-REDIS_PASSWORD="<password>"
-REDIS_TLS="false"
+UPSTASH_REDIS_URL="rediss://default:<password>@<endpoint>.upstash.io:6379"
 ```
 
-If `REDIS_URL` is set, it takes precedence over the separate Redis fields.
+Do not use `UPSTASH_REDIS_REST_URL` or `UPSTASH_REDIS_REST_TOKEN` for FlowEngine execution. BullMQ uses persistent Redis commands through `ioredis`, so it needs the TCP Redis endpoint.
+
+You can also use separate Upstash fields instead of `UPSTASH_REDIS_URL`:
+
+```text
+UPSTASH_REDIS_HOST="<endpoint>.upstash.io"
+UPSTASH_REDIS_PORT="6379"
+UPSTASH_REDIS_USERNAME="default"
+UPSTASH_REDIS_PASSWORD="<password>"
+```
+
+`UPSTASH_REDIS_URL` takes precedence over the separate Upstash fields. For local development without Upstash, `REDIS_URL="redis://localhost:6379"` and `REDIS_TLS="false"` still work as a fallback.
 
 ## Install
 
@@ -100,7 +104,7 @@ Migrations create the pipeline tables and the local `User` table used by FlowEng
 
 ## Development
 
-Start Redis and PostgreSQL first, then run both apps:
+Start PostgreSQL and make sure the Upstash Redis credentials are present, then run both apps:
 
 ```bash
 npm run dev
@@ -180,5 +184,5 @@ REST endpoints:
 
 Socket events:
 
-- Client to server: `execute_pipeline`
-- Server to client: `execution_started`, `node_status_changed`, `data_flow`, `execution_completed`, `execution_error`
+- Client to server: `execute_pipeline`, `cancel_execution`
+- Server to client: `execution_started`, `node_status_changed`, `data_flow`, `node_output`, `execution_progress`, `execution_completed`, `execution_cancelled`, `execution_error`

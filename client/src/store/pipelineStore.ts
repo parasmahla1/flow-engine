@@ -23,6 +23,7 @@ import type {
   PipelineSchema
 } from "@flowengine/shared";
 import { defaultConfigForKind, labelForKind } from "@flowengine/shared";
+import { layoutDagLeftToRight } from "../lib/autoLayout";
 import { canConnectKinds, wouldCreateCycle } from "../lib/graph";
 
 export interface FlowEdgeData {
@@ -55,6 +56,13 @@ export interface NodeInspectorSnapshot {
 
 export type RunHistoryStatus = "running" | "success" | "error" | "stopped";
 
+export interface ExecutionProgress {
+  completedNodes: number;
+  totalNodes: number;
+  currentNodeId?: string | undefined;
+  percent: number;
+}
+
 export interface RunHistoryEntry {
   executionId: string;
   status: RunHistoryStatus;
@@ -76,6 +84,7 @@ interface PipelineState {
   outputLogs: OutputLogEntry[];
   nodeInspector: Record<string, NodeInspectorSnapshot>;
   runHistory: RunHistoryEntry[];
+  runProgress: ExecutionProgress | null;
   selectedNodeId: string | null;
   isRunning: boolean;
   connectionStatus: "connecting" | "connected" | "disconnected";
@@ -84,6 +93,8 @@ interface PipelineState {
   setPipelineName: (name: string) => void;
   addNode: (kind: NodeKind, position: XYPosition) => string;
   selectNode: (nodeId: string | null) => void;
+  autoLayout: () => void;
+  replaceWorkflow: (pipeline: PipelineSchema) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   connectNodes: (connection: Connection) => boolean;
@@ -99,7 +110,9 @@ interface PipelineState {
   appendNodeOutput: (payload: NodeOutputPayload) => void;
   clearOutput: () => void;
   startExecution: (executionId: string) => void;
+  setExecutionProgress: (progress: Omit<ExecutionProgress, "percent">) => void;
   finishExecution: (summary?: { totalDuration: number; totalDataProcessed: number }) => void;
+  cancelExecution: (message?: string) => void;
   failExecution: (message: string) => void;
   stopLocalExecution: () => void;
   setConnectionStatus: (status: PipelineState["connectionStatus"]) => void;
@@ -116,7 +129,8 @@ const snapshotGraph = (state: Pick<PipelineState, "nodes" | "edges">): GraphSnap
 
 const withHistory = (
   state: PipelineState,
-  graph: Pick<PipelineState, "nodes" | "edges"> & Partial<Pick<PipelineState, "selectedNodeId">>
+  graph: Pick<PipelineState, "nodes" | "edges"> &
+    Partial<Pick<PipelineState, "pipelineId" | "pipelineName" | "selectedNodeId">>
 ) => ({
   ...graph,
   historyPast: [...state.historyPast, snapshotGraph(state)].slice(-historyLimit),
@@ -215,6 +229,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   outputLogs: [],
   nodeInspector: {},
   runHistory: [],
+  runProgress: null,
   selectedNodeId: null,
   isRunning: false,
   connectionStatus: "connecting",
@@ -222,13 +237,51 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   lastError: null,
   setPipelineName: (pipelineName) => set({ pipelineName }),
   addNode: (kind, position) => {
+    if (get().isRunning) {
+      return "";
+    }
+
     const node = createFlowNode(kind, position);
     set((state) => withHistory(state, { nodes: [...state.nodes, node], edges: state.edges }));
     return node.id;
   },
-  selectNode: (selectedNodeId) => set({ selectedNodeId }),
+  selectNode: (selectedNodeId) =>
+    set((state) => ({
+      selectedNodeId,
+      nodes: state.nodes.map((node) => ({ ...node, selected: selectedNodeId === node.id })),
+      edges: state.edges.map((edge) => ({ ...edge, selected: false }))
+    })),
+  autoLayout: () =>
+    set((state) => {
+      if (state.isRunning || state.nodes.length === 0) {
+        return {};
+      }
+
+      return withHistory(state, {
+        nodes: layoutDagLeftToRight(state.nodes, state.edges),
+        edges: state.edges
+      });
+    }),
+  replaceWorkflow: (pipeline) =>
+    set((state) => {
+      if (state.isRunning) {
+        return {};
+      }
+
+      return withHistory(state, {
+        pipelineId: pipeline.id ?? null,
+        pipelineName: pipeline.name,
+        nodes: pipeline.nodes.map(fromPipelineNode),
+        edges: pipeline.edges.map(fromPipelineEdge),
+        selectedNodeId: null
+      });
+    }),
   onNodesChange: (changes) =>
     set((state) => {
+      if (state.isRunning && changes.some((change) => change.type !== "select")) {
+        return {};
+      }
+
       const nodes = applyNodeChanges<PipelineNodeData>(changes, state.nodes) as FlowNode[];
       const selectionOnly = changes.every((change) => change.type === "select");
       const removedNodeIds = new Set(
@@ -245,12 +298,20 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }),
   onEdgesChange: (changes) =>
     set((state) => {
+      if (state.isRunning && changes.some((change) => change.type !== "select")) {
+        return {};
+      }
+
       const edges = applyEdgeChanges<FlowEdgeData>(changes, state.edges);
       const selectionOnly = changes.every((change) => change.type === "select");
 
       return selectionOnly ? { edges } : withHistory(state, { nodes: state.nodes, edges });
     }),
   connectNodes: (connection) => {
+    if (get().isRunning) {
+      return false;
+    }
+
     if (
       !connection.source ||
       !connection.target ||
@@ -280,6 +341,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
   deleteEdge: (edgeId) =>
     set((state) => {
+      if (state.isRunning) {
+        return {};
+      }
+
       if (!state.edges.some((edge) => edge.id === edgeId)) {
         return {};
       }
@@ -291,6 +356,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }),
   deleteSelection: () =>
     set((state) => {
+      if (state.isRunning) {
+        return {};
+      }
+
       const selectedNodeIds = new Set(
         state.nodes
           .filter((node) => node.selected || node.id === state.selectedNodeId)
@@ -335,7 +404,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }),
   pasteWorkflow: () =>
     set((state) => {
-      if (!state.copiedWorkflow) {
+      if (state.isRunning || !state.copiedWorkflow) {
         return {};
       }
 
@@ -386,6 +455,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }),
   undo: () =>
     set((state) => {
+      if (state.isRunning) {
+        return {};
+      }
+
       const previous = state.historyPast[state.historyPast.length - 1];
 
       if (!previous) {
@@ -402,6 +475,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }),
   redo: () =>
     set((state) => {
+      if (state.isRunning) {
+        return {};
+      }
+
       const next = state.historyFuture[0];
 
       if (!next) {
@@ -418,20 +495,22 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }),
   updateNodeConfig: (nodeId, config) =>
     set((state) =>
-      withHistory(state, {
-        nodes: state.nodes.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  config
-                }
-              }
-            : node
-        ),
-        edges: state.edges
-      })
+      state.isRunning
+        ? {}
+        : withHistory(state, {
+            nodes: state.nodes.map((node) =>
+              node.id === nodeId
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      config
+                    }
+                  }
+                : node
+            ),
+            edges: state.edges
+          })
     ),
   setNodeStatus: (nodeId, status) =>
     set((state) => ({
@@ -521,6 +600,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       lastError: null,
       outputLogs: [],
       nodeInspector: {},
+      runProgress: {
+        completedNodes: 0,
+        totalNodes: state.nodes.length,
+        percent: 0
+      },
       runHistory: [
         {
           executionId: lastExecutionId,
@@ -538,9 +622,26 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         }
       }))
     })),
+  setExecutionProgress: ({ completedNodes, totalNodes, currentNodeId }) =>
+    set({
+      runProgress: {
+        completedNodes,
+        totalNodes,
+        currentNodeId,
+        percent: totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0
+      }
+    }),
   finishExecution: (summary) =>
     set((state) => ({
       isRunning: false,
+      runProgress: state.runProgress
+        ? {
+            ...state.runProgress,
+            completedNodes: state.runProgress.totalNodes,
+            currentNodeId: undefined,
+            percent: 100
+          }
+        : null,
       runHistory: state.runHistory.map((entry, index) =>
         index === 0 && entry.status === "running"
           ? {
@@ -557,10 +658,44 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
           : entry
       )
     })),
+  cancelExecution: (message = "Execution cancelled.") =>
+    set((state) => ({
+      lastError: message,
+      isRunning: false,
+      runProgress: state.runProgress
+        ? {
+            ...state.runProgress,
+            currentNodeId: undefined
+          }
+        : null,
+      runHistory: state.runHistory.map((entry, index) =>
+        index === 0 && entry.status === "running"
+          ? {
+              ...entry,
+              status: "stopped",
+              completedAt: new Date().toISOString(),
+              error: message
+            }
+          : entry
+      ),
+      nodes: state.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          status: node.data.status === "processing" ? "idle" : node.data.status
+        }
+      }))
+    })),
   failExecution: (lastError) =>
     set((state) => ({
       lastError,
       isRunning: false,
+      runProgress: state.runProgress
+        ? {
+            ...state.runProgress,
+            currentNodeId: undefined
+          }
+        : null,
       runHistory: state.runHistory.map((entry, index) =>
         index === 0 && entry.status === "running"
           ? {
@@ -575,6 +710,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   stopLocalExecution: () =>
     set((state) => ({
       isRunning: false,
+      runProgress: state.runProgress
+        ? {
+            ...state.runProgress,
+            currentNodeId: undefined
+          }
+        : null,
       runHistory: state.runHistory.map((entry, index) =>
         index === 0 && entry.status === "running"
           ? {
@@ -603,6 +744,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       historyFuture: [],
       outputLogs: [],
       nodeInspector: {},
+      runProgress: null,
       selectedNodeId: null,
       lastError: null
     }),

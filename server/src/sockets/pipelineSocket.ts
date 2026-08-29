@@ -9,7 +9,12 @@ import type { Server } from "socket.io";
 import { verifyAuthToken } from "../services/auth.js";
 import { parsePipelinePayload } from "../services/pipelinePayload.js";
 import { validatePipeline } from "../services/pipelineValidation.js";
-import type { ExecutionJob, ExecutionResult, PipelineNamespace } from "../workers/pipelineWorker.js";
+import {
+  requestExecutionCancellation,
+  type ExecutionJob,
+  type ExecutionResult,
+  type PipelineNamespace
+} from "../workers/pipelineWorker.js";
 
 export const registerPipelineSocket = (
   io: Server<ClientToServerEvents, ServerToClientEvents>,
@@ -48,6 +53,35 @@ export const registerPipelineSocket = (
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to execute pipeline.";
+        socket.emit("execution_error", { executionId, message });
+      }
+    });
+
+    socket.on("cancel_execution", async ({ executionId }) => {
+      requestExecutionCancellation(executionId);
+
+      try {
+        const job = await queue.getJob(executionId);
+
+        if (!job) {
+          socket.emit("execution_cancelled", {
+            executionId,
+            message: "Execution cancelled."
+          });
+          return;
+        }
+
+        const isActive = await job.isActive();
+
+        if (!isActive) {
+          await job.remove();
+          socket.emit("execution_cancelled", {
+            executionId,
+            message: "Execution cancelled."
+          });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to cancel execution.";
         socket.emit("execution_error", { executionId, message });
       }
     });

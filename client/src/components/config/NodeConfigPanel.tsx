@@ -29,10 +29,10 @@ const Field = ({ label, children }: FieldProps) => (
 );
 
 const inputClass =
-  "h-9 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
+  "h-9 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500";
 
 const textareaClass =
-  "min-h-24 w-full resize-none rounded-md border border-zinc-300 bg-white p-3 font-mono text-xs outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
+  "min-h-24 w-full resize-none rounded-md border border-zinc-300 bg-white p-3 font-mono text-xs outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500";
 
 export const NodeConfigPanel = () => {
   const selectedNodeId = usePipelineStore((state) => state.selectedNodeId);
@@ -61,7 +61,7 @@ export const NodeConfigPanel = () => {
           <p className="mt-1 text-xs font-medium text-zinc-500">{selectedNode.data.kind}</p>
         </div>
 
-        <div className="space-y-3">
+        <fieldset className="space-y-3" disabled={isRunning}>
           {selectedNode.data.kind === "MOCK_SOURCE" ? (
             (() => {
               const config = selectedNode.data.config as MockSourceConfig;
@@ -188,7 +188,7 @@ export const NodeConfigPanel = () => {
               );
             })()
           ) : null}
-        </div>
+        </fieldset>
 
         {isRunning ? (
           <div className="space-y-2 border-t border-zinc-300 pt-4">

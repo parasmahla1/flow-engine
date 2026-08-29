@@ -11,6 +11,7 @@ import ReactFlow, {
   type NodeTypes,
   type EdgeTypes
 } from "reactflow";
+import { GitBranch } from "lucide-react";
 import { shallow } from "zustand/shallow";
 import { isNodeKind } from "@flowengine/shared";
 import { ParticleEdge } from "./ParticleEdge";
@@ -29,11 +30,14 @@ const selector = (state: ReturnType<typeof usePipelineStore.getState>) => ({
   copySelection: state.copySelection,
   pasteWorkflow: state.pasteWorkflow,
   undo: state.undo,
-  redo: state.redo
+  redo: state.redo,
+  autoLayout: state.autoLayout,
+  selectedNodeId: state.selectedNodeId,
+  isRunning: state.isRunning
 });
 
 export const PipelineCanvas = () => {
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setCenter } = useReactFlow();
   const {
     nodes,
     edges,
@@ -46,7 +50,10 @@ export const PipelineCanvas = () => {
     copySelection,
     pasteWorkflow,
     undo,
-    redo
+    redo,
+    autoLayout,
+    selectedNodeId,
+    isRunning
   } =
     usePipelineStore(selector, shallow);
 
@@ -61,6 +68,11 @@ export const PipelineCanvas = () => {
   const handleDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+
+      if (isRunning) {
+        return;
+      }
+
       const kind = event.dataTransfer.getData("application/flowengine-node");
 
       if (!isNodeKind(kind)) {
@@ -75,8 +87,25 @@ export const PipelineCanvas = () => {
         })
       );
     },
-    [addNode, screenToFlowPosition]
+    [addNode, isRunning, screenToFlowPosition]
   );
+
+  useEffect(() => {
+    if (!selectedNodeId) {
+      return;
+    }
+
+    const node = nodes.find((item) => item.id === selectedNodeId);
+
+    if (!node) {
+      return;
+    }
+
+    setCenter(node.position.x + 105, node.position.y + 43, {
+      zoom: 1,
+      duration: 300
+    });
+  }, [nodes, selectedNodeId, setCenter]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -149,6 +178,9 @@ export const PipelineCanvas = () => {
         onNodeClick={(_, node) => selectNode(node.id)}
         onPaneClick={() => selectNode(null)}
         fitView
+        nodesDraggable={!isRunning}
+        nodesConnectable={!isRunning}
+        edgesUpdatable={!isRunning}
         multiSelectionKeyCode={["Meta", "Shift"]}
         selectionKeyCode="Shift"
         deleteKeyCode={null}
@@ -178,8 +210,17 @@ export const PipelineCanvas = () => {
           }}
         />
         <Controls position="bottom-left" />
-        <Panel position="top-left" className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-600 shadow-sm">
-          DAG Canvas
+        <Panel position="top-left" className="rounded-md border border-zinc-300 bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            className="inline-flex h-8 items-center gap-2 rounded-md px-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isRunning || nodes.length === 0}
+            onClick={autoLayout}
+            title="Auto layout"
+          >
+            <GitBranch size={14} />
+            Auto Layout
+          </button>
         </Panel>
       </ReactFlow>
     </section>

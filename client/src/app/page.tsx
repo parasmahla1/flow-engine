@@ -11,11 +11,11 @@ import { DisconnectedBanner } from "@/components/layout/DisconnectedBanner";
 import { usePipelineExecution } from "@/hooks/usePipelineExecution";
 
 const FlowWorkspace = () => {
-  const { runPipeline, stopLocalExecution } = usePipelineExecution();
+  const { runPipeline, cancelExecution } = usePipelineExecution();
 
   return (
     <main className="flex h-screen min-h-0 flex-col bg-zinc-100 text-zinc-950">
-      <TopBar onRun={runPipeline} onStop={stopLocalExecution} />
+      <TopBar onRun={runPipeline} onStop={cancelExecution} />
       <DisconnectedBanner />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <AppSidebar />

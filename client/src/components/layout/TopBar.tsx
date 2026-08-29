@@ -40,6 +40,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const pipelineName = usePipelineStore((state) => state.pipelineName);
   const isRunning = usePipelineStore((state) => state.isRunning);
+  const runProgress = usePipelineStore((state) => state.runProgress);
   const nodes = usePipelineStore((state) => state.nodes);
   const edges = usePipelineStore((state) => state.edges);
   const historyPast = usePipelineStore((state) => state.historyPast);
@@ -50,6 +51,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   const logout = useAuthStore((state) => state.logout);
   const setPipelineName = usePipelineStore((state) => state.setPipelineName);
   const loadPipeline = usePipelineStore((state) => state.loadPipeline);
+  const replaceWorkflow = usePipelineStore((state) => state.replaceWorkflow);
   const toPipelineSchema = usePipelineStore((state) => state.toPipelineSchema);
   const failExecution = usePipelineStore((state) => state.failExecution);
   const undo = usePipelineStore((state) => state.undo);
@@ -74,6 +76,10 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   };
 
   const handleExport = () => {
+    if (isRunning) {
+      return;
+    }
+
     const pipeline = toPipelineSchema();
     const blob = new Blob([JSON.stringify(pipeline, null, 2)], {
       type: "application/json"
@@ -88,7 +94,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   };
 
   const handleImport = async (file: File | undefined) => {
-    if (!file) {
+    if (!file || isRunning) {
       return;
     }
 
@@ -99,7 +105,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         throw new Error("Invalid pipeline JSON.");
       }
 
-      loadPipeline({
+      replaceWorkflow({
         name: imported.name,
         nodes: imported.nodes,
         edges: imported.edges
@@ -124,10 +130,26 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
 
       <input
         aria-label="Pipeline name"
-        className="h-9 min-w-0 flex-1 rounded-md border border-zinc-300 bg-zinc-50 px-3 text-sm font-medium outline-none transition focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-100"
+        className="h-9 min-w-0 flex-1 rounded-md border border-zinc-300 bg-zinc-50 px-3 text-sm font-medium outline-none transition focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:text-zinc-500"
         value={pipelineName}
+        disabled={isRunning}
         onChange={(event) => setPipelineName(event.target.value)}
       />
+
+      {runProgress ? (
+        <div className="w-36 shrink-0">
+          <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-zinc-500">
+            <span>{isRunning ? "Running" : "Progress"}</span>
+            <span>{runProgress.percent}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200">
+            <div
+              className="h-full rounded-full bg-teal-600 transition-all"
+              style={{ width: `${runProgress.percent}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {lastError ? (
         <div className="max-w-sm truncate rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -139,7 +161,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         <button
           type="button"
           className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={historyPast.length === 0}
+          disabled={isRunning || historyPast.length === 0}
           onClick={undo}
           aria-label="Undo"
           title="Undo"
@@ -149,7 +171,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         <button
           type="button"
           className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={historyFuture.length === 0}
+          disabled={isRunning || historyFuture.length === 0}
           onClick={redo}
           aria-label="Redo"
           title="Redo"
@@ -159,7 +181,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         <button
           type="button"
           className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!hasSelection}
+          disabled={isRunning || !hasSelection}
           onClick={copySelection}
           aria-label="Copy"
           title="Copy"
@@ -169,7 +191,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         <button
           type="button"
           className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!copiedWorkflow}
+          disabled={isRunning || !copiedWorkflow}
           onClick={pasteWorkflow}
           aria-label="Paste"
           title="Paste"
@@ -179,7 +201,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         <button
           type="button"
           className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!hasSelection}
+          disabled={isRunning || !hasSelection}
           onClick={deleteSelection}
           aria-label="Delete"
           title="Delete"
@@ -191,7 +213,8 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
       <div className="flex h-9 items-center gap-1 border-l border-zinc-300 pl-3">
         <button
           type="button"
-          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={isRunning}
           onClick={handleExport}
           aria-label="Export workflow"
           title="Export workflow"
@@ -200,7 +223,8 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         </button>
         <button
           type="button"
-          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"
+          className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={isRunning}
           onClick={() => importInputRef.current?.click()}
           aria-label="Import workflow"
           title="Import workflow"
@@ -219,7 +243,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
       <button
         type="button"
         className="inline-flex h-9 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={saving}
+        disabled={saving || isRunning}
         onClick={() => void handleSave()}
       >
         <Save size={16} />
@@ -241,7 +265,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         title={validation.isReady ? "Run" : "Fix validation errors before running"}
       >
         <Play size={16} fill="currentColor" />
-        Run
+        {isRunning ? "Running" : "Run"}
       </button>
 
       <button
@@ -249,8 +273,8 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
         className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={!isRunning}
         onClick={onStop}
-        aria-label="Stop"
-        title="Stop"
+        aria-label="Cancel execution"
+        title="Cancel execution"
       >
         <Square size={16} fill="currentColor" />
       </button>

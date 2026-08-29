@@ -33,6 +33,27 @@ export const createPipelineQueue = (): Queue<ExecutionJob, ExecutionResult> =>
     connection: createRedisConnection()
   });
 
+const cancelledExecutionIds = new Set<string>();
+
+export const requestExecutionCancellation = (executionId: string): void => {
+  cancelledExecutionIds.add(executionId);
+};
+
+const isExecutionCancelled = (executionId: string): boolean =>
+  cancelledExecutionIds.has(executionId);
+
+const clearExecutionCancellation = (executionId: string): void => {
+  cancelledExecutionIds.delete(executionId);
+};
+
+const emitExecutionCancelled = (
+  namespace: PipelineNamespace,
+  executionId: string,
+  message = "Execution cancelled."
+): void => {
+  namespace.emit("execution_cancelled", { executionId, message });
+};
+
 const incomingChunksForNode = (
   nodeId: string,
   edges: PipelineEdge[],
@@ -66,11 +87,29 @@ const executeJob = async (
   const { levels } = validatePipeline(pipeline);
   const chunksByNodeId = new Map<string, PipelineChunk[]>();
   let totalDataProcessed = 0;
+  let completedNodes = 0;
+  const totalNodes = pipeline.nodes.length;
 
   for (const level of levels) {
+    if (isExecutionCancelled(executionId)) {
+      emitExecutionCancelled(namespace, executionId);
+      clearExecutionCancellation(executionId);
+      return { totalDuration: Date.now() - startedAt, totalDataProcessed };
+    }
+
     await Promise.all(
       level.map(async (node) => {
+        if (isExecutionCancelled(executionId)) {
+          return;
+        }
+
         namespace.emit("node_status_changed", { nodeId: node.id, status: "processing" });
+        namespace.emit("execution_progress", {
+          executionId,
+          completedNodes,
+          totalNodes,
+          currentNodeId: node.id
+        });
 
         try {
           const inputChunks = incomingChunksForNode(node.id, pipeline.edges, chunksByNodeId);
@@ -79,7 +118,14 @@ const executeJob = async (
 
           chunksByNodeId.set(node.id, result.chunks);
           totalDataProcessed += result.dataProcessed;
+          completedNodes += 1;
           namespace.emit("node_status_changed", { nodeId: node.id, status: "success" });
+          namespace.emit("execution_progress", {
+            executionId,
+            completedNodes,
+            totalNodes,
+            currentNodeId: node.id
+          });
 
           if (node.kind === "CONSOLE_SINK") {
             namespace.emit("node_output", {
@@ -99,13 +145,21 @@ const executeJob = async (
             }
           }
         } catch (error) {
+          clearExecutionCancellation(executionId);
           emitNodeError(namespace, executionId, node.id, error);
           throw error;
         }
       })
     );
+
+    if (isExecutionCancelled(executionId)) {
+      emitExecutionCancelled(namespace, executionId);
+      clearExecutionCancellation(executionId);
+      return { totalDuration: Date.now() - startedAt, totalDataProcessed };
+    }
   }
 
+  clearExecutionCancellation(executionId);
   const totalDuration = Date.now() - startedAt;
 
   namespace.emit("execution_completed", {
