@@ -4,8 +4,17 @@ import "reactflow/dist/style.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FlowEngine",
-  description: "Real-time data pipeline visualizer"
+  title: {
+    default: "FlowEngine | Visual pipelines that explain themselves",
+    template: "%s | FlowEngine"
+  },
+  description: "Build, validate, and observe real-time data pipelines in one clear workspace.",
+  keywords: ["data pipelines", "workflow builder", "ETL", "real-time data"],
+  openGraph: {
+    title: "FlowEngine | Visual pipelines that explain themselves",
+    description: "Build, validate, and observe real-time data pipelines in one clear workspace.",
+    type: "website"
+  }
 };
 
 export default function RootLayout({
