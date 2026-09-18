@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { ProductPreview } from "./ProductPreview";
 
-import { ThemeToggle } from "@/theme/ThemeToggle";
+import { ThemeToggle } from "../theme/ThemeToggle";
 
 const features = [
   { number: "01", title: "Build the route", text: "Place sources, transforms, and sinks exactly where they belong. The canvas is the diagram your team can actually operate.", icon: GitBranch, detail: "Visual DAG editor" },
