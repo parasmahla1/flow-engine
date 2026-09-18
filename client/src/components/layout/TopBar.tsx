@@ -19,6 +19,7 @@ import { validateWorkflow } from "@/lib/pipelineValidation";
 import { useAuthStore } from "@/store/authStore";
 import { usePipelineStore } from "@/store/pipelineStore";
 import type { PipelineSchema } from "@flowengine/shared";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 interface TopBarProps {
   onRun: () => void;
@@ -281,6 +282,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
 
       <div className="flex h-9 items-center gap-2 border-l border-zinc-300 pl-3">
         <span className="max-w-28 truncate text-xs font-medium text-zinc-600">{user?.username}</span>
+        <ThemeToggle />
         <button
           type="button"
           className="grid h-9 w-9 place-items-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"

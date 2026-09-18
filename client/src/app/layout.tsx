@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "reactflow/dist/style.css";
 import "./globals.css";
 
@@ -24,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><ThemeProvider>{children}</ThemeProvider></body>
     </html>
   );
 }
