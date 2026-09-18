@@ -10,13 +10,25 @@ import { registerPipelineSocket } from "./sockets/pipelineSocket.js";
 import { createPipelineQueue, createPipelineWorker } from "./workers/pipelineWorker.js";
 
 const port = Number(process.env.SERVER_PORT ?? 4000);
-const clientUrl = process.env.CLIENT_URL ?? "http://localhost:3000";
+
+const normalizeOrigin = (value: string): string => {
+  try {
+    return new URL(value.trim()).origin;
+  } catch {
+    return value.trim().replace(/\/+$/, "");
+  }
+};
+
+const clientOrigins = (process.env.CLIENT_URL ?? "http://localhost:3000")
+  .split(",")
+  .map(normalizeOrigin)
+  .filter(Boolean);
 
 const prisma = new PrismaClient();
 const app = fastify({ logger: true });
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(app.server, {
   cors: {
-    origin: clientUrl,
+    origin: clientOrigins,
     methods: ["GET", "POST", "PUT", "DELETE"]
   }
 });
@@ -26,7 +38,7 @@ const namespace = registerPipelineSocket(io, queue);
 const worker = createPipelineWorker(namespace);
 
 await app.register(cors, {
-  origin: clientUrl,
+  origin: clientOrigins,
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["content-type", "authorization"]
 });
