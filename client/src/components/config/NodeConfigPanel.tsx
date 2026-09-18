@@ -54,7 +54,7 @@ export const NodeConfigPanel = () => {
   };
 
   return (
-    <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-zinc-300 bg-white p-4 shadow-panel">
+    <aside className="node-config-panel w-[300px] shrink-0 overflow-y-auto border-l border-zinc-300 bg-white p-4 shadow-panel">
       <div className="space-y-4">
         <div>
           <h2 className="truncate text-sm font-semibold text-zinc-900">{selectedNode.data.label}</h2>

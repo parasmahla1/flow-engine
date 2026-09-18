@@ -120,7 +120,7 @@ export const TopBar = ({ onRun, onStop }: TopBarProps) => {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-zinc-300 bg-white px-4">
+    <header className="app-topbar flex h-14 shrink-0 items-center gap-3 border-b border-zinc-300 bg-white px-4">
       <div className="flex h-9 items-center gap-2 border-r border-zinc-300 pr-4">
         <div className="grid h-8 w-8 place-items-center rounded-md bg-teal-700 text-sm font-semibold text-white">
           FE

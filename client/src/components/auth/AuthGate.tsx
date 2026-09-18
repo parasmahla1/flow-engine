@@ -1,9 +1,10 @@
 "use client";
 
-import { LogIn, UserPlus } from "lucide-react";
+import { ArrowRight, LogIn, UserPlus } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
+import { OnboardingWizard } from "./OnboardingWizard";
 
 interface AuthGateProps {
   children: ReactNode;
@@ -13,6 +14,7 @@ export const AuthGate = ({ children }: AuthGateProps) => {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [onboarding, setOnboarding] = useState(false);
   const user = useAuthStore((state) => state.user);
   const isReady = useAuthStore((state) => state.isReady);
   const isLoading = useAuthStore((state) => state.isLoading);
@@ -25,6 +27,12 @@ export const AuthGate = ({ children }: AuthGateProps) => {
     void bootstrap();
   }, [bootstrap]);
 
+  useEffect(() => {
+    if (user && window.localStorage.getItem("flowengine-onboarding-complete") !== "true") {
+      setOnboarding(true);
+    }
+  }, [user]);
+
   if (!isReady) {
     return (
       <main className="grid h-screen place-items-center bg-zinc-100 text-sm font-medium text-zinc-600">
@@ -34,7 +42,12 @@ export const AuthGate = ({ children }: AuthGateProps) => {
   }
 
   if (user) {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        {onboarding ? <OnboardingWizard onComplete={() => setOnboarding(false)} /> : null}
+      </>
+    );
   }
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -49,18 +62,20 @@ export const AuthGate = ({ children }: AuthGateProps) => {
   };
 
   return (
-    <main className="grid min-h-screen place-items-center bg-zinc-100 p-6 text-zinc-950">
+    <main className="auth-shell grid min-h-screen place-items-center p-6 text-zinc-950">
       <form
-        className="w-full max-w-sm rounded-md border border-zinc-300 bg-white p-5 shadow-panel"
+        className="auth-card w-full max-w-[420px] rounded-md border border-zinc-300 bg-white p-6 shadow-panel"
         onSubmit={(event) => void submit(event)}
       >
         <div className="mb-5">
-          <div className="grid h-10 w-10 place-items-center rounded-md bg-teal-700 text-sm font-semibold text-white">
-            FE
-          </div>
-          <h1 className="mt-4 text-lg font-semibold text-zinc-900">
+          <div className="auth-brand"><span>F</span> FlowEngine</div>
+          <p className="auth-kicker">The visual pipeline workspace</p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-normal text-zinc-900">
             {mode === "login" ? "Sign in to FlowEngine" : "Create FlowEngine account"}
           </h1>
+          <p className="mt-2 text-sm leading-6 text-zinc-500">
+            {mode === "login" ? "Pick up where your data left off." : "Build your first observable pipeline in a few minutes."}
+          </p>
         </div>
 
         <div className="space-y-3">
@@ -103,10 +118,10 @@ export const AuthGate = ({ children }: AuthGateProps) => {
         <button
           type="submit"
           disabled={isLoading}
-          className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="button mt-5 w-full rounded-md bg-teal-700 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {mode === "login" ? <LogIn size={16} /> : <UserPlus size={16} />}
-          {isLoading ? "Working" : mode === "login" ? "Sign in" : "Create account"}
+          {isLoading ? "Working" : mode === "login" ? "Sign in" : "Create account"} <ArrowRight size={15} />
         </button>
 
         <button

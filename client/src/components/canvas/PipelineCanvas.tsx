@@ -162,7 +162,7 @@ export const PipelineCanvas = () => {
   }, [copySelection, deleteSelection, pasteWorkflow, redo, undo]);
 
   return (
-    <section className="min-w-0 flex-1 bg-zinc-100">
+    <section className="pipeline-canvas min-w-0 flex-1 bg-zinc-100">
       <ReactFlow
         nodes={nodes}
         edges={edges}
